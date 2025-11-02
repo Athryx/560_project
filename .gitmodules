@@ -1,3 +1,6 @@
 [submodule "submodules/verus"]
 	path = submodules/verus
 	url = https://github.com/verus-lang/verus.git
+[submodule "submodules/verus-proof-synthesis"]
+	path = submodules/verus-proof-synthesis
+	url = https://github.com/FaaizMemonPurdue/verus-proof-synthesis.git

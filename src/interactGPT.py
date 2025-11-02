@@ -10,6 +10,11 @@ messages = [
 
 print("Verus Proof Assistant (type 'exit' to quit)\n")
 
+
+#Paths 
+
+Verus_Source = "../submodules/verus/source/"
+
 while True:
     message = input("Proof Query: ")
     if message.lower() in ["exit", "quit"]:
