@@ -8,6 +8,7 @@ FROM seahorn/buildpack-deps-seahorn:$BASE_IMAGE
 
 # Assume that docker-build is ran in the top-level SeaHorn directory
 COPY submodules/seahorn /seahorn
+
 # Re-create the build directory that might have been present in the source tree
 RUN rm -rf /seahorn/build /seahorn/debug /seahorn/release && \
   mkdir /seahorn/build && \
@@ -108,15 +109,21 @@ RUN --mount=type=cache,target=/opt/cache/rustup rustup toolchain install nightly
     rustup toolchain install 1.66.0 && \
     rustup default nightly-2022-03-01
 
+
 ############################################
 # Copy Verus-Proof-Synthesis submodule
 ############################################
 COPY --chown=appuser:appuser submodules/verus-proof-synthesis /home/appuser/verus-proof-synthesis
 
+COPY --chown=appuser:appuser test_cases /home/appuser/verus-proof-synthesis/test_cases
+COPY --chown=appuser:appuser seahorn_script.sh /home/appuser/verus-proof-synthesis/seahorn_script.sh
+
 ############################################
 # Build Verus
 ############################################
 WORKDIR /home/appuser/verus-proof-synthesis
+RUN mkdir smt_output
+RUN chmod +x seahorn_script.sh
 RUN git clone https://github.com/verus-lang/verus.git
 
 WORKDIR /home/appuser/verus-proof-synthesis/verus
