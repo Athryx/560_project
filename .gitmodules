@@ -3,4 +3,7 @@
 	url = https://github.com/verus-lang/verus.git
 [submodule "submodules/verus-proof-synthesis"]
 	path = submodules/verus-proof-synthesis
-	url = https://github.com/FaaizMemonPurdue/verus-proof-synthesis.git
+	url = git@github.com:FaaizMemonPurdue/verus-proof-synthesis.git
+[submodule "submodules/seahorn"]
+	path = submodules/seahorn
+	url = git@github.com:seahorn/seahorn.git
