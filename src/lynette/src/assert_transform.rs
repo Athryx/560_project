@@ -4,8 +4,9 @@ use std::path::PathBuf;
 use crate::utils::*;
 use crate::deghost::{deghost_merge_files, remove_verus_macro};
 use syn_verus::{
-    BinOp, Block, Expr, ExprBinary, FnArg, FnArgKind, FnMode, ItemFn, Pat, PatIdent, PatType, ReturnType, Specification, Stmt, Type, TypeTuple, parse_quote
+    BinOp, Block, Expr, ExprBinary, ExprBlock, FnArg, FnArgKind, FnMode, ItemFn, Pat, PatIdent, PatType, ReturnType, Specification, Stmt, Type, TypeTuple, UnOp, parse_quote
 };
+use syn_verus::visit_mut::{self, VisitMut};
 use quote::format_ident;
 
 fn mk_assert(expr: &Expr) -> Stmt {
@@ -23,7 +24,7 @@ fn and_expr(lhs: Expr, rhs: Expr) -> Expr {
     Expr::Binary(result)
 }
 
-fn imply_expr(lhs: &Expr, rhs: &Expr) -> Expr {
+fn imply_expr(lhs: &Expr, rhs: &Expr) -> ExprBinary {
     parse_quote! {
         !(#lhs) || (#rhs)
     }
@@ -35,17 +36,81 @@ fn true_expr() -> Expr {
     }
 }
 
+fn transform_quantifier(clause: &Expr, is_forall: bool) -> Expr {
+    let Expr::Closure(closure) = clause else {
+        panic!("quantifier must be followed by closure");
+    };
+
+    let closure_ident = format_ident!("condition");
+    let result_ident = format_ident!("result");
+    let arg_idents = (0..closure.inputs.len())
+        .map(|n| format_ident!("arg{n}"));
+
+    let exit_condition = !is_forall;
+    let start_value = is_forall;
+    let update_value = !start_value;
+
+    let args = arg_idents.clone();
+    let mut loop_body: Expr = parse_quote! {{
+        if #closure_ident( #(#args),* ) == #exit_condition {
+            #result_ident = #update_value;
+            break;
+        }
+    }};
+
+    for (arg, arg_name) in closure.inputs.iter().zip(arg_idents) {
+        // TODO: based on arg pick range
+        loop_body = parse_quote! {{
+            for #arg_name in (i64::MIN)..=(i64::MAX) {
+                #loop_body
+            }
+        }};
+    }
+
+    let result: Expr = parse_quote! {{
+        let #closure_ident = #closure;
+        let mut #result_ident = #start_value;
+        #loop_body;
+        #result_ident
+    }};
+
+    result
+}
+
+/// Attempts to transform verus specs into executable code which checks at runtime
+struct SpecConversionVisitor;
+
+impl VisitMut for SpecConversionVisitor {
+    fn visit_expr_binary_mut(&mut self, expr_binary: &mut ExprBinary) {
+        match expr_binary.op {
+            BinOp::Imply(_) => *expr_binary = imply_expr(&expr_binary.left, &expr_binary.right),
+            _ => (),
+        }
+
+        visit_mut::visit_expr_binary_mut(self, expr_binary);
+    }
+
+    fn visit_expr_mut(&mut self, expr: &mut Expr) {
+        match expr {
+            Expr::Unary(expr_unary) => {
+                match expr_unary.op {
+                    UnOp::Forall(_) => *expr = transform_quantifier(&expr_unary.expr, true),
+                    UnOp::Exists(_) => *expr = transform_quantifier(&expr_unary.expr, false),
+                    _ => (),
+                }
+            }
+            _ => (),
+        }
+
+        visit_mut::visit_expr_mut(self, expr);
+    }
+}
+
 // converts verus specific things like quantifiers and such
 fn expression_for_spec_part(expr: Expr) -> Expr {
-    match &expr {
-        // TODO: handle all the goofy verus operators
-        // for now imply is the only one thats really used much
-        Expr::Binary(ExprBinary { op, left, right, .. }) => match op {
-            BinOp::Imply(_) => imply_expr(left, right),
-            _ => expr,
-        }
-        _ => expr,
-    }
+    let mut out = expr.clone();
+    SpecConversionVisitor.visit_expr_mut(&mut out);
+    out
 }
 
 fn expression_for_spec(spec: &Specification) -> Expr {
@@ -165,46 +230,26 @@ fn transform_fn(func: &mut ItemFn) -> Vec<ItemFn> {
         },
     };
 
-    transform_block(&mut func.block, &requires_expr);
+    InvariantTransformer.visit_block_mut(&mut func.block);
 
     make_wrapper_fn(func, &return_pattern, &return_type, &requires_expr, &ensures_expr)
 }
 
-fn transform_block(block: &mut Block, requires_expr: &Expr) {
-    let mut new_stmts = Vec::new();
-    for stmt in &block.stmts {
-        let mut stmt = stmt.clone();
-        transform_stmt(&mut stmt, requires_expr);
-        new_stmts.push(stmt);
-    }
-    block.stmts = new_stmts;
-}
+/// Transforms loop invariants into asserts
+struct InvariantTransformer;
 
-fn transform_stmt(stmt: &mut Stmt, requires_exprs: &Expr) {
-    match stmt {
-        Stmt::Expr(expr) | Stmt::Semi(expr, _) => {
-            transform_expr(expr, requires_exprs);
-        }
-        Stmt::Local(local) => {
-            if let Some((_, expr)) = &mut local.init {
-                transform_expr(expr, requires_exprs);
-            }
-        }
-        // TODO: item
-        _ => {}
-    }
-}
-
-fn transform_expr(expr: &mut Expr, requires_exprs: &Expr) {
-    if let Expr::While(expr_while) = expr {
+impl VisitMut for InvariantTransformer {
+    fn visit_expr_while_mut(&mut self, expr_while: &mut syn_verus::ExprWhile) {
         if let Some(invariants) = &expr_while.invariant {
             let invariant_expr = expression_for_spec(&invariants.exprs);
 
-            let assert_stmt = mk_assert(&imply_expr(requires_exprs, &invariant_expr));
+            let assert_stmt = mk_assert(&invariant_expr);
             expr_while.body.stmts.insert(0, assert_stmt.clone());
             expr_while.body.stmts.push(assert_stmt);
         }
         expr_while.invariant = None;
+
+        visit_mut::visit_expr_while_mut(self, expr_while);
     }
 }
 
