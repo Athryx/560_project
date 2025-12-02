@@ -17,6 +17,14 @@ fn mk_assert(expr: &Expr) -> Stmt {
     Stmt::Expr(assert_expr)
 }
 
+fn mk_assert_semi(expr: &Expr) -> Stmt {
+    let assert_mac = parse_quote! {
+        assert!(#expr)
+    };
+    let assert_expr = Expr::Macro(assert_mac);
+    Stmt::Semi(assert_expr, Default::default())
+}
+
 fn and_expr(lhs: Expr, rhs: Expr) -> Expr {
     let result = parse_quote! {
         (#lhs) && (#rhs)
@@ -24,9 +32,15 @@ fn and_expr(lhs: Expr, rhs: Expr) -> Expr {
     Expr::Binary(result)
 }
 
-fn imply_expr(lhs: &Expr, rhs: &Expr) -> ExprBinary {
+fn imply_expr(lhs: &Expr, rhs: &Expr) -> Expr {
     parse_quote! {
         !(#lhs) || (#rhs)
+    }
+}
+
+fn put_parens(expr: &Expr) -> Expr {
+    parse_quote! {
+        (#expr)
     }
 }
 
@@ -81,16 +95,8 @@ fn transform_quantifier(clause: &Expr, is_forall: bool) -> Expr {
 struct SpecConversionVisitor;
 
 impl VisitMut for SpecConversionVisitor {
-    fn visit_expr_binary_mut(&mut self, expr_binary: &mut ExprBinary) {
-        match expr_binary.op {
-            BinOp::Imply(_) => *expr_binary = imply_expr(&expr_binary.left, &expr_binary.right),
-            _ => (),
-        }
-
-        visit_mut::visit_expr_binary_mut(self, expr_binary);
-    }
-
     fn visit_expr_mut(&mut self, expr: &mut Expr) {
+        visit_mut::visit_expr_mut(self, expr);
         match expr {
             Expr::Unary(expr_unary) => {
                 match expr_unary.op {
@@ -99,10 +105,12 @@ impl VisitMut for SpecConversionVisitor {
                     _ => (),
                 }
             }
+            Expr::Binary(expr_binary) => match expr_binary.op {
+                BinOp::Imply(_) => *expr = imply_expr(&expr_binary.left, &expr_binary.right),
+                _ => *expr = put_parens(&expr),
+            }
             _ => (),
         }
-
-        visit_mut::visit_expr_mut(self, expr);
     }
 }
 
@@ -189,17 +197,7 @@ fn make_wrapper_fn(func: &ItemFn, return_pattern: &Pat, return_type: &Type, requ
     vec![pre_check_fn, post_check_fn, wrapper_fn]
 }
 
-fn transform_fn(func: &mut ItemFn) -> Vec<ItemFn> {
-    let requires_expr = func.sig.requires
-        .as_ref()
-        .map(|requires| expression_for_spec(&requires.exprs))
-        .unwrap_or_else(true_expr);
-
-    let ensures_expr = func.sig.ensures
-        .as_ref()
-        .map(|ensures| expression_for_spec(&ensures.exprs))
-        .unwrap_or_else(true_expr);
-
+fn reset_fn_sig(func: &mut ItemFn) -> (Pat, Box<Type>) {
     func.sig.erase_spec_fields();
     // erase_spec_fields doesn't set this back to default
     // ensures spec functions turn into regular functions
@@ -230,6 +228,31 @@ fn transform_fn(func: &mut ItemFn) -> Vec<ItemFn> {
         },
     };
 
+    (return_pattern, return_type)
+}
+
+fn transform_fn(func: &mut ItemFn) -> Vec<ItemFn> {
+    // for spec function just translate body and do nothing else
+    if matches!(func.sig.mode, FnMode::Spec(_)) {
+        SpecConversionVisitor.visit_block_mut(&mut func.block);
+        reset_fn_sig(func);
+
+        return Vec::new();
+    }
+
+    let requires_expr = func.sig.requires
+        .as_ref()
+        .map(|requires| expression_for_spec(&requires.exprs))
+        .unwrap_or_else(true_expr);
+
+    let ensures_expr = func.sig.ensures
+        .as_ref()
+        .map(|ensures| expression_for_spec(&ensures.exprs))
+        .unwrap_or_else(true_expr);
+
+    // get rid of named return types
+    let (return_pattern, return_type) = reset_fn_sig(func);
+
     InvariantTransformer.visit_block_mut(&mut func.block);
 
     make_wrapper_fn(func, &return_pattern, &return_type, &requires_expr, &ensures_expr)
@@ -243,7 +266,7 @@ impl VisitMut for InvariantTransformer {
         if let Some(invariants) = &expr_while.invariant {
             let invariant_expr = expression_for_spec(&invariants.exprs);
 
-            let assert_stmt = mk_assert(&invariant_expr);
+            let assert_stmt = mk_assert_semi(&invariant_expr);
             expr_while.body.stmts.insert(0, assert_stmt.clone());
             expr_while.body.stmts.push(assert_stmt);
         }
