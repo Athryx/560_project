@@ -1,27 +1,86 @@
-fn main () {
-    let jumps = vec![2,3,1,1,4];
-    let result = jump(&jumps);
-    println!("Minimum jumps: {}", result);
+#![no_std]
+#![no_main]
+#![feature(lang_items)]
+#![feature(start)]
+
+use core::panic::PanicInfo;
+
+// ------------------------------------------
+// Required runtime stubs for no_std
+// ------------------------------------------
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
 }
 
-fn jump(xs: &Vec<i32>) -> (result: i32)
-{
-    let (mut l, mut r) = (0usize, 0usize);
-    let mut out = 0i32;
-    let len: usize = xs.len();
+#[lang = "eh_personality"]
+extern "C" fn eh_personality() {}
 
-    while r + 1 < len {
+
+// =========================================================
+// Jump Game II (Greedy) — SeaHorn Compatible Version
+// =========================================================
+
+const N: usize = 5;
+
+#[no_mangle]
+pub extern "C" fn jump(xs: &[i32; N]) -> i32 {
+    let mut l: usize = 0;
+    let mut r: usize = 0;
+    let mut out: i32 = 0;
+
+    // while r + 1 < len
+    while r + 1 < N {
         let mut max_reach = r;
-        let end = r + 1; // iterate over [l, end)
-        for j in l..end {
-            let reach = j.saturating_add(xs[j] as usize);
+        let end = r + 1;   // iterate over [l, end]
+
+        let mut j = l;
+        while j < end {
+            // compute reach = j + xs[j]
+            let step = xs[j];
+            let mut reach = j;
+
+            if step > 0 {
+                // manually saturating add without traits/panics
+                let add = step as usize;
+                if j > core::usize::MAX - add {
+                    reach = core::usize::MAX;
+                } else {
+                    reach = j + add;
+                }
+            }
+
             if reach > max_reach {
                 max_reach = reach;
             }
+
+            j += 1;
         }
+
         l = end;
         r = max_reach;
+
         out += 1;
     }
+
     out
+}
+
+
+// =========================================================
+// SeaHorn entry point: test the logic
+// =========================================================
+
+#[no_mangle]
+pub extern "C" fn main() -> i32 {
+    // test case: [2,3,1,1,4]
+    let arr: [i32; N] = [2, 3, 1, 1, 4];
+
+    let result = jump(&arr);
+
+    // For this input, minimum jumps = 2
+    assert!(result == 2);
+
+    0
 }
