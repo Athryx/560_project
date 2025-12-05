@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::utils::*;
 use crate::deghost::{deghost_merge_files, remove_verus_macro};
 use syn_verus::{
-    BinOp, Block, Expr, ExprBinary, ExprBlock, FnArg, FnArgKind, FnMode, ItemFn, Pat, PatIdent, PatType, ReturnType, Specification, Stmt, Type, TypeTuple, UnOp, parse_quote
+    BinOp, Block, Expr, ExprBinary, ExprBlock, FnArg, FnArgKind, FnMode, Item, ItemFn, Pat, PatIdent, PatType, ReturnType, Specification, Stmt, Type, TypeTuple, UnOp, UseTree, parse_quote
 };
 use syn_verus::visit_mut::{self, VisitMut};
 use quote::format_ident;
@@ -50,8 +50,39 @@ fn true_expr() -> Expr {
     }
 }
 
-fn transform_quantifier(clause: &Expr, is_forall: bool) -> Expr {
-    let Expr::Closure(closure) = clause else {
+fn add_cast(expr: &Expr, typ: &str) -> Expr {
+    let typ = format_ident!("{}", typ);
+    parse_quote! {
+        (#expr as #typ)
+    }
+}
+
+struct CastVisitor;
+
+// FIXME: this whole thing is hacky fix to get types to check out cause we don't have much time
+impl VisitMut for CastVisitor {
+    fn visit_expr_mut(&mut self, expr: &mut syn_verus::Expr) {
+        visit_mut::visit_expr_mut(self, expr);
+
+        match expr {
+            Expr::Index(expr_index) => {
+                expr_index.index = Box::new(add_cast(&expr_index.index, "usize"));
+            }
+            Expr::MethodCall(expr_method_call) => {
+                if expr_method_call.method.to_string() == "len" {
+                    *expr = add_cast(expr, "i128");
+                }
+            }
+            Expr::Path(expr_path) => {
+                *expr = add_cast(expr, "i128");
+            }
+            _ => (),
+        }
+    }
+}
+
+fn transform_quantifier(clause: Expr, is_forall: bool) -> Expr {
+    let Expr::Closure(mut closure) = clause else {
         panic!("quantifier must be followed by closure");
     };
 
@@ -72,13 +103,19 @@ fn transform_quantifier(clause: &Expr, is_forall: bool) -> Expr {
         }
     }};
 
-    for (arg, arg_name) in closure.inputs.iter().zip(arg_idents) {
+    for (arg, arg_name) in closure.inputs.iter_mut().zip(arg_idents) {
         // TODO: based on arg pick range
         loop_body = parse_quote! {{
-            for #arg_name in (i64::MIN)..=(i64::MAX) {
-                #loop_body
+            for #arg_name in 0..=(i128::MAX) {
+                for #arg_name in [#arg_name, -#arg_name] {
+                    #loop_body
+                }
             }
         }};
+
+        if let Pat::Type(pat_type) = arg {
+            *arg = *pat_type.pat.clone();
+        }
     }
 
     let result: Expr = parse_quote! {{
@@ -100,8 +137,8 @@ impl VisitMut for SpecConversionVisitor {
         match expr {
             Expr::Unary(expr_unary) => {
                 match expr_unary.op {
-                    UnOp::Forall(_) => *expr = transform_quantifier(&expr_unary.expr, true),
-                    UnOp::Exists(_) => *expr = transform_quantifier(&expr_unary.expr, false),
+                    UnOp::Forall(_) => *expr = transform_quantifier(*expr_unary.expr.clone(), true),
+                    UnOp::Exists(_) => *expr = transform_quantifier(*expr_unary.expr.clone(), false),
                     _ => (),
                 }
             }
@@ -114,17 +151,48 @@ impl VisitMut for SpecConversionVisitor {
     }
 }
 
+struct ComparisonConversionVisitor;
+
+fn is_comparison(expr: &ExprBinary) -> bool {
+    matches!(expr.op, BinOp::Lt(_) | BinOp::Gt(_) | BinOp::Le(_) | BinOp::Ge(_))
+}
+
+impl VisitMut for ComparisonConversionVisitor {
+    fn visit_expr_binary_mut(&mut self, expr_binary: &mut ExprBinary) {
+        if is_comparison(expr_binary) {
+            let op = expr_binary.op;
+            if let Expr::Binary(ref lhs) = *expr_binary.left && is_comparison(lhs) {
+                let lhs_right = &*lhs.right;
+                let rhs = &*expr_binary.right;
+                *expr_binary = parse_quote! {
+                    (#lhs) && (#lhs_right #op #rhs)
+                };
+            } else if let Expr::Binary(ref rhs) = *expr_binary.right && is_comparison(rhs) {
+                let rhs_left = &*rhs.left;
+                let lhs = &*expr_binary.left;
+                *expr_binary = parse_quote! {
+                    (#lhs #op #rhs_left) && (#rhs)
+                }
+            }
+        }
+        visit_mut::visit_expr_binary_mut(self, expr_binary);
+    }
+}
+
 // converts verus specific things like quantifiers and such
-fn expression_for_spec_part(expr: Expr) -> Expr {
-    let mut out = expr.clone();
-    SpecConversionVisitor.visit_expr_mut(&mut out);
-    out
+fn update_expression_spec(expr: &mut Expr) {
+    ComparisonConversionVisitor.visit_expr_mut(expr);
+    CastVisitor.visit_expr_mut(expr);
+    SpecConversionVisitor.visit_expr_mut(expr);
 }
 
 fn expression_for_spec(spec: &Specification) -> Expr {
     spec.exprs.iter()
-        .cloned()
-        .map(expression_for_spec_part)
+        .map(|expr| {
+            let mut expr = expr.clone();
+            update_expression_spec(&mut expr);
+            expr
+        })
         .reduce(and_expr)
         .unwrap_or_else(true_expr)
 }
@@ -234,6 +302,8 @@ fn reset_fn_sig(func: &mut ItemFn) -> (Pat, Box<Type>) {
 fn transform_fn(func: &mut ItemFn) -> Vec<ItemFn> {
     // for spec function just translate body and do nothing else
     if matches!(func.sig.mode, FnMode::Spec(_)) {
+        ComparisonConversionVisitor.visit_block_mut(&mut func.block);
+        CastVisitor.visit_block_mut(&mut func.block);
         SpecConversionVisitor.visit_block_mut(&mut func.block);
         reset_fn_sig(func);
 
@@ -276,12 +346,24 @@ impl VisitMut for InvariantTransformer {
     }
 }
 
+fn is_vstd_import(item: &Item) -> bool {
+    let Item::Use(item_use) = item else {
+        return false;
+    };
+
+    let UseTree::Path(use_path) = &item_use.tree else {
+        return false;
+    };
+
+    use_path.ident.to_string() == "vstd"
+}
+
 fn assert_transform_parsed_file(file: &mut syn_verus::File) {
     let mut new_functions = Vec::new();
     for item in &mut file.items {
-        if let syn_verus::Item::Fn(func) = item {
+        if let Item::Fn(func) = item {
             new_functions.extend(transform_fn(func).into_iter()
-                .map(|function| syn_verus::Item::Fn(function)));
+                .map(|function| Item::Fn(function)));
         }
     }
     file.items.extend(new_functions);
@@ -290,7 +372,10 @@ fn assert_transform_parsed_file(file: &mut syn_verus::File) {
 // need &PathBuf for helper functions
 // original helpers are written weirdly
 fn assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf) -> Result<(), Error> {
-    let parsed_file = fload_file(old_file_path)?;
+    let mut parsed_file = fload_file(old_file_path)?;
+    // remove vstd imports
+    parsed_file.items.retain(|item| !is_vstd_import(item));
+
     let pure_file = remove_verus_macro(&parsed_file);
 
     let mut parsed_verus_blocks = extract_verus_macro(&parsed_file)?;
