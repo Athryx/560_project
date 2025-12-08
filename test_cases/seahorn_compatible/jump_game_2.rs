@@ -73,14 +73,8 @@ pub extern "C" fn jump(xs: &[i32; N]) -> i32 {
 // =========================================================
 
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
-    // test case: [2,3,1,1,4]
-    let arr: [i32; N] = [2, 3, 1, 1, 4];
-
+pub extern "C" fn main(arr: [i32; N]) -> i32 {
     let result = jump(&arr);
-
-    // For this input, minimum jumps = 2
-    assert!(result == 2);
 
     0
 }

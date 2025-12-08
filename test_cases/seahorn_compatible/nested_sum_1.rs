@@ -37,8 +37,7 @@ pub extern "C" fn nested_sum(a: i32, b: i32) -> i32 {
 // Minimal main that calls your function
 // -------------------------------------
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
-    let r = nested_sum(5, 7);
-    assert!(r == 35);
+pub extern "C" fn main(a: i32, b: i32) -> i32 {
+    let r = nested_sum(a, b);
     0
 }

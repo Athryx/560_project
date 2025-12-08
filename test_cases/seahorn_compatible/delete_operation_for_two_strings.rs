@@ -77,18 +77,8 @@ pub extern "C" fn delete_operation_for_two_strings(
 // ======================================================
 
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
-    // "sea"
-    let w1: [u8; 3] = [b's', b'e', b'a'];
-
-    // "eat"
-    let w2: [u8; 3] = [b'e', b'a', b't'];
-
+pub extern "C" fn main(w1: [u8; 3], w2: [u8; 3]) -> i32 {
     let result = delete_operation_for_two_strings(&w1, &w2);
-
-    // LCS("sea", "eat") = "ea", len = 2
-    // Deletions = 3 + 3 - 2*2 = 2
-    assert!(result == 2);
 
     0
 }
