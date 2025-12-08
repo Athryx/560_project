@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::utils::*;
 use crate::deghost::{deghost_merge_files, remove_verus_macro};
 use syn_verus::{
-    BinOp, Block, Expr, ExprBinary, ExprBlock, FnArg, FnArgKind, FnMode, Item, ItemFn, Pat, PatIdent, PatType, ReturnType, Specification, Stmt, Type, TypeTuple, UnOp, UseTree, parse_quote
+    BinOp, Block, Expr, ExprBinary, FnArg, FnArgKind, FnMode, Ident, Item, ItemFn, Pat, PatIdent, PatType, ReturnType, Specification, Stmt, Type, TypeArray, TypeTuple, UnOp, UseTree, parse_quote
 };
 use syn_verus::visit_mut::{self, VisitMut};
 use quote::format_ident;
@@ -73,8 +73,9 @@ impl VisitMut for CastVisitor {
                     *expr = add_cast(expr, "i128");
                 }
             }
-            Expr::Path(expr_path) => {
-                *expr = add_cast(expr, "i128");
+            Expr::Path(_expr_path) => {
+                // FIXME: figure out this casting issue
+                // *expr = add_cast(expr, "i128");
             }
             _ => (),
         }
@@ -197,7 +198,71 @@ fn expression_for_spec(spec: &Specification) -> Expr {
         .unwrap_or_else(true_expr)
 }
 
-fn make_wrapper_fn(func: &ItemFn, return_pattern: &Pat, return_type: &Type, requires_expr: &Expr, ensures_expr: &Expr) -> Vec<ItemFn> {
+fn make_crux_symbolic_argument_inner(arg: &Type, arg_name: Ident) -> Vec<Stmt> {
+    let arg_name_str = arg_name.to_string();
+
+    match arg {
+        Type::Reference(ref_type) => if let Type::Slice(slice_type) = &*ref_type.elem {
+            let array_typ = Type::Array(TypeArray {
+                bracket_token: Default::default(),
+                elem: slice_type.elem.clone(),
+                semi_token: Default::default(),
+                len: parse_quote!(1),
+            });
+
+            let arr_name = format_ident!("symbolic_array_{arg_name}");
+
+            parse_quote! {
+                let #arr_name = <#array_typ as Symbolic>::symbolic(#arg_name_str);
+                let #arg_name = crucible::symbolic::prefix(&#arr_name[..]);
+            }
+        } else {
+            let ref_name = format_ident!("ref_{arg_name}");
+            let mut inner_statements = make_crux_symbolic_argument_inner(&ref_type.elem, ref_name.clone());
+            inner_statements.push(parse_quote! {
+                let #arg_name = &#ref_name;
+            });
+            inner_statements
+        },
+        typ => parse_quote! {
+            let #arg_name = <#typ as Symbolic>::symbolic(#arg_name_str);
+        },
+    }
+}
+
+// FIXME: returning vec of stmt is a bit hacky
+fn make_crux_symbolic_argument(arg: &FnArg, arg_name: Ident) -> Vec<Stmt> {
+    let FnArgKind::Typed(arg) = &arg.kind else {
+        panic!("recevier args not supported for testing in crux");
+    };
+
+    make_crux_symbolic_argument_inner(&arg.ty, arg_name)
+}
+
+/// Creates a crux test function which calls the given function with symbolic values
+fn make_crux_test_fn(func: &ItemFn) -> ItemFn {
+    let arg_names = (0..func.sig.inputs.len())
+        .map(|i| format_ident!("arg{i}"));
+
+    let arg_stmts = func.sig.inputs.iter()
+        .zip(arg_names.clone())
+        .map(|(arg, arg_name)| make_crux_symbolic_argument(arg, arg_name))
+        .flatten();
+
+    let name = func.sig.ident.clone();
+    let test_name = format_ident!("test_{}", name);
+    let mut result: ItemFn = parse_quote! {
+        #[cfg_attr(crux, crux::test)]
+        fn #test_name() {
+            #name( #(#arg_names),* );
+        }
+    };
+
+    result.block.stmts.splice(0..0, arg_stmts);
+    result
+}
+
+fn make_wrapper_fn(func: &ItemFn, return_pattern: &Pat, return_type: &Type, requires_expr: &Expr, ensures_expr: &Expr, make_crux_test: bool) -> Vec<ItemFn> {
     let mut wrapper_fn = func.clone();
 
     // change name
@@ -262,7 +327,11 @@ fn make_wrapper_fn(func: &ItemFn, return_pattern: &Pat, return_type: &Type, requ
     // wrapper_body.stmts.insert(1, ensures_stmt.clone());
     wrapper_fn.block = Box::new(wrapper_body);
 
-    vec![pre_check_fn, post_check_fn, wrapper_fn]
+    let mut out = vec![pre_check_fn, post_check_fn, wrapper_fn.clone()];
+    if make_crux_test {
+        out.push(make_crux_test_fn(&wrapper_fn));
+    }
+    out
 }
 
 fn reset_fn_sig(func: &mut ItemFn) -> (Pat, Box<Type>) {
@@ -299,7 +368,7 @@ fn reset_fn_sig(func: &mut ItemFn) -> (Pat, Box<Type>) {
     (return_pattern, return_type)
 }
 
-fn transform_fn(func: &mut ItemFn) -> Vec<ItemFn> {
+fn transform_fn(func: &mut ItemFn, make_crux_test: bool) -> Vec<ItemFn> {
     // for spec function just translate body and do nothing else
     if matches!(func.sig.mode, FnMode::Spec(_)) {
         ComparisonConversionVisitor.visit_block_mut(&mut func.block);
@@ -325,7 +394,7 @@ fn transform_fn(func: &mut ItemFn) -> Vec<ItemFn> {
 
     InvariantTransformer.visit_block_mut(&mut func.block);
 
-    make_wrapper_fn(func, &return_pattern, &return_type, &requires_expr, &ensures_expr)
+    make_wrapper_fn(func, &return_pattern, &return_type, &requires_expr, &ensures_expr, make_crux_test)
 }
 
 /// Transforms loop invariants into asserts
@@ -358,11 +427,11 @@ fn is_vstd_import(item: &Item) -> bool {
     use_path.ident.to_string() == "vstd"
 }
 
-fn assert_transform_parsed_file(file: &mut syn_verus::File) {
+fn assert_transform_parsed_file(file: &mut syn_verus::File, crux_test: bool) {
     let mut new_functions = Vec::new();
     for item in &mut file.items {
         if let Item::Fn(func) = item {
-            new_functions.extend(transform_fn(func).into_iter()
+            new_functions.extend(transform_fn(func, crux_test).into_iter()
                 .map(|function| Item::Fn(function)));
         }
     }
@@ -371,16 +440,26 @@ fn assert_transform_parsed_file(file: &mut syn_verus::File) {
 
 // need &PathBuf for helper functions
 // original helpers are written weirdly
-fn assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf) -> Result<(), Error> {
+fn assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf, crux_test: bool) -> Result<(), Error> {
     let mut parsed_file = fload_file(old_file_path)?;
     // remove vstd imports
     parsed_file.items.retain(|item| !is_vstd_import(item));
+    
+    if crux_test {
+        // add crux imports
+        parsed_file.items.insert(0, parse_quote! {
+            #[cfg(crux)] extern crate crucible;
+        });
+        parsed_file.items.insert(1, parse_quote! {
+            #[cfg(crux)] use crucible::*;
+        });
+    }
 
     let pure_file = remove_verus_macro(&parsed_file);
 
     let mut parsed_verus_blocks = extract_verus_macro(&parsed_file)?;
     for file in parsed_verus_blocks.iter_mut() {
-        assert_transform_parsed_file(file);
+        assert_transform_parsed_file(file, crux_test);
     }
 
     let new_file = deghost_merge_files(&pure_file, parsed_verus_blocks);
@@ -391,8 +470,8 @@ fn assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf) -> Re
     Ok(())
 }
 
-pub fn do_assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf) {
-    if let Err(error) = assert_transform_file(old_file_path, new_file_path) {
+pub fn do_assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf, crux_test: bool) {
+    if let Err(error) = assert_transform_file(old_file_path, new_file_path, crux_test) {
         eprintln!("error transforming file: {}", error);
     }
 }

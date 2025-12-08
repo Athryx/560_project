@@ -1,3 +1,7 @@
+#[cfg(crux)]
+extern crate crucible;
+#[cfg(crux)]
+use crucible::*;
 fn sum(mut input: &[u8]) -> Vec<u8> {
     let mut output = Vec::new();
     let mut i = 0;
@@ -13,10 +17,7 @@ fn sum_assert_pre_check(mut input: &[u8]) -> bool {
 }
 fn sum_assert_post_check(mut input: &[u8], r: Vec<u8>) {
     assert!({
-        let condition = |i| {
-            !((0 <= (i as i128)) && ((i as i128) < ((r as i128).len() as i128)))
-                || ((r as i128)[((i as i128) as usize)] == 69)
-        };
+        let condition = |i| !((0 <= i) && (i < (r.len() as i128))) || (r[(i as usize)] == 69);
         let mut result = true;
         {
             for arg0 in 0..=(i128::MAX) {
@@ -38,4 +39,10 @@ fn sum_assert_wrapper(arg0: &[u8]) {
         let result = sum(arg0);
         sum_assert_post_check(arg0, result);
     };
+}
+#[cfg_attr(crux, crux::test)]
+fn test_sum_assert_wrapper() {
+    let symbolic_array_arg0 = <[u8; 1] as Symbolic>::symbolic("arg0");
+    let arg0 = crucible::symbolic::prefix(&symbolic_array_arg0[..]);
+    sum_assert_wrapper(arg0);
 }

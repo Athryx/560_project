@@ -327,6 +327,8 @@ struct AssertTransform {
     input: PathBuf,
     #[clap(short, long, help = "Output file for assert transformed code")]
     output: PathBuf,
+    #[clap(short, long, help = "Set up a crux test for generating counterexamples")]
+    crux_test: bool,
 }
 
 #[derive(Subcommand)]
@@ -872,7 +874,7 @@ fn main() {
             }
         }
         Commands::AssertTransform(args) => {
-            do_assert_transform_file(&args.input, &args.output);
+            do_assert_transform_file(&args.input, &args.output, args.crux_test);
         }
     };
 }
