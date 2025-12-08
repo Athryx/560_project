@@ -20,7 +20,7 @@ fn sum_assert_post_check(mut input: &[u8], r: Vec<u8>) {
         let condition = |i| !((0 <= i) && (i < (r.len() as i128))) || (r[(i as usize)] == 69);
         let mut result = true;
         {
-            for arg0 in 0..=(i128::MAX) {
+            for arg0 in 0..(100u32 as i128) {
                 for arg0 in [arg0, -arg0] {
                     {
                         if condition(arg0) == false {

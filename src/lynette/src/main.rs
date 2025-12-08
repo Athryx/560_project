@@ -16,6 +16,7 @@ mod merge;
 mod unimpl;
 mod utils;
 
+use crate::assert_transform::TransformOptions;
 use crate::assert_transform::do_assert_transform_file;
 use crate::code::*;
 use crate::deghost::*;
@@ -329,6 +330,8 @@ struct AssertTransform {
     output: PathBuf,
     #[clap(short, long, help = "Set up a crux test for generating counterexamples")]
     crux_test: bool,
+    #[clap(short, long, help = "Number of iterations to unroll quantifiers for", default_value = "100")]
+    quantifier_iterations: u32,
 }
 
 #[derive(Subcommand)]
@@ -874,7 +877,10 @@ fn main() {
             }
         }
         Commands::AssertTransform(args) => {
-            do_assert_transform_file(&args.input, &args.output, args.crux_test);
+            do_assert_transform_file(&args.input, &args.output, &TransformOptions {
+                crux_test: args.crux_test,
+                quantifier_iterations: args.quantifier_iterations,
+            });
         }
     };
 }

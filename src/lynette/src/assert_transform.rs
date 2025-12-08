@@ -82,7 +82,7 @@ impl VisitMut for CastVisitor {
     }
 }
 
-fn transform_quantifier(clause: Expr, is_forall: bool) -> Expr {
+fn transform_quantifier(clause: Expr, is_forall: bool, quantifier_iterations: u32) -> Expr {
     let Expr::Closure(mut closure) = clause else {
         panic!("quantifier must be followed by closure");
     };
@@ -107,7 +107,7 @@ fn transform_quantifier(clause: Expr, is_forall: bool) -> Expr {
     for (arg, arg_name) in closure.inputs.iter_mut().zip(arg_idents) {
         // TODO: based on arg pick range
         loop_body = parse_quote! {{
-            for #arg_name in 0..=(i128::MAX) {
+            for #arg_name in 0..(#quantifier_iterations as i128) {
                 for #arg_name in [#arg_name, -#arg_name] {
                     #loop_body
                 }
@@ -130,7 +130,17 @@ fn transform_quantifier(clause: Expr, is_forall: bool) -> Expr {
 }
 
 /// Attempts to transform verus specs into executable code which checks at runtime
-struct SpecConversionVisitor;
+struct SpecConversionVisitor {
+    quantifier_iterations: u32,
+}
+
+impl SpecConversionVisitor {
+    fn new(options: &TransformOptions) -> Self {
+        SpecConversionVisitor {
+            quantifier_iterations: options.quantifier_iterations,
+        }
+    }
+}
 
 impl VisitMut for SpecConversionVisitor {
     fn visit_expr_mut(&mut self, expr: &mut Expr) {
@@ -138,8 +148,8 @@ impl VisitMut for SpecConversionVisitor {
         match expr {
             Expr::Unary(expr_unary) => {
                 match expr_unary.op {
-                    UnOp::Forall(_) => *expr = transform_quantifier(*expr_unary.expr.clone(), true),
-                    UnOp::Exists(_) => *expr = transform_quantifier(*expr_unary.expr.clone(), false),
+                    UnOp::Forall(_) => *expr = transform_quantifier(*expr_unary.expr.clone(), true, self.quantifier_iterations),
+                    UnOp::Exists(_) => *expr = transform_quantifier(*expr_unary.expr.clone(), false, self.quantifier_iterations),
                     _ => (),
                 }
             }
@@ -181,17 +191,17 @@ impl VisitMut for ComparisonConversionVisitor {
 }
 
 // converts verus specific things like quantifiers and such
-fn update_expression_spec(expr: &mut Expr) {
+fn update_expression_spec(expr: &mut Expr, options: &TransformOptions) {
     ComparisonConversionVisitor.visit_expr_mut(expr);
     CastVisitor.visit_expr_mut(expr);
-    SpecConversionVisitor.visit_expr_mut(expr);
+    SpecConversionVisitor::new(options).visit_expr_mut(expr);
 }
 
-fn expression_for_spec(spec: &Specification) -> Expr {
+fn expression_for_spec(spec: &Specification, options: &TransformOptions) -> Expr {
     spec.exprs.iter()
         .map(|expr| {
             let mut expr = expr.clone();
-            update_expression_spec(&mut expr);
+            update_expression_spec(&mut expr, options);
             expr
         })
         .reduce(and_expr)
@@ -262,7 +272,7 @@ fn make_crux_test_fn(func: &ItemFn) -> ItemFn {
     result
 }
 
-fn make_wrapper_fn(func: &ItemFn, return_pattern: &Pat, return_type: &Type, requires_expr: &Expr, ensures_expr: &Expr, make_crux_test: bool) -> Vec<ItemFn> {
+fn make_wrapper_fn(func: &ItemFn, return_pattern: &Pat, return_type: &Type, requires_expr: &Expr, ensures_expr: &Expr, options: &TransformOptions) -> Vec<ItemFn> {
     let mut wrapper_fn = func.clone();
 
     // change name
@@ -328,7 +338,7 @@ fn make_wrapper_fn(func: &ItemFn, return_pattern: &Pat, return_type: &Type, requ
     wrapper_fn.block = Box::new(wrapper_body);
 
     let mut out = vec![pre_check_fn, post_check_fn, wrapper_fn.clone()];
-    if make_crux_test {
+    if options.crux_test {
         out.push(make_crux_test_fn(&wrapper_fn));
     }
     out
@@ -368,12 +378,12 @@ fn reset_fn_sig(func: &mut ItemFn) -> (Pat, Box<Type>) {
     (return_pattern, return_type)
 }
 
-fn transform_fn(func: &mut ItemFn, make_crux_test: bool) -> Vec<ItemFn> {
+fn transform_fn(func: &mut ItemFn, options: &TransformOptions) -> Vec<ItemFn> {
     // for spec function just translate body and do nothing else
     if matches!(func.sig.mode, FnMode::Spec(_)) {
         ComparisonConversionVisitor.visit_block_mut(&mut func.block);
         CastVisitor.visit_block_mut(&mut func.block);
-        SpecConversionVisitor.visit_block_mut(&mut func.block);
+        SpecConversionVisitor::new(options).visit_block_mut(&mut func.block);
         reset_fn_sig(func);
 
         return Vec::new();
@@ -381,29 +391,33 @@ fn transform_fn(func: &mut ItemFn, make_crux_test: bool) -> Vec<ItemFn> {
 
     let requires_expr = func.sig.requires
         .as_ref()
-        .map(|requires| expression_for_spec(&requires.exprs))
+        .map(|requires| expression_for_spec(&requires.exprs, options))
         .unwrap_or_else(true_expr);
 
     let ensures_expr = func.sig.ensures
         .as_ref()
-        .map(|ensures| expression_for_spec(&ensures.exprs))
+        .map(|ensures| expression_for_spec(&ensures.exprs, options))
         .unwrap_or_else(true_expr);
 
     // get rid of named return types
     let (return_pattern, return_type) = reset_fn_sig(func);
 
-    InvariantTransformer.visit_block_mut(&mut func.block);
+    InvariantTransformer {
+        options,
+    }.visit_block_mut(&mut func.block);
 
-    make_wrapper_fn(func, &return_pattern, &return_type, &requires_expr, &ensures_expr, make_crux_test)
+    make_wrapper_fn(func, &return_pattern, &return_type, &requires_expr, &ensures_expr, options)
 }
 
 /// Transforms loop invariants into asserts
-struct InvariantTransformer;
+struct InvariantTransformer<'a> {
+    options: &'a TransformOptions
+}
 
-impl VisitMut for InvariantTransformer {
+impl VisitMut for InvariantTransformer<'_> {
     fn visit_expr_while_mut(&mut self, expr_while: &mut syn_verus::ExprWhile) {
         if let Some(invariants) = &expr_while.invariant {
-            let invariant_expr = expression_for_spec(&invariants.exprs);
+            let invariant_expr = expression_for_spec(&invariants.exprs, self.options);
 
             let assert_stmt = mk_assert_semi(&invariant_expr);
             expr_while.body.stmts.insert(0, assert_stmt.clone());
@@ -427,11 +441,11 @@ fn is_vstd_import(item: &Item) -> bool {
     use_path.ident.to_string() == "vstd"
 }
 
-fn assert_transform_parsed_file(file: &mut syn_verus::File, crux_test: bool) {
+fn assert_transform_parsed_file(file: &mut syn_verus::File, options: &TransformOptions) {
     let mut new_functions = Vec::new();
     for item in &mut file.items {
         if let Item::Fn(func) = item {
-            new_functions.extend(transform_fn(func, crux_test).into_iter()
+            new_functions.extend(transform_fn(func, options).into_iter()
                 .map(|function| Item::Fn(function)));
         }
     }
@@ -440,12 +454,12 @@ fn assert_transform_parsed_file(file: &mut syn_verus::File, crux_test: bool) {
 
 // need &PathBuf for helper functions
 // original helpers are written weirdly
-fn assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf, crux_test: bool) -> Result<(), Error> {
+fn assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf, options: &TransformOptions) -> Result<(), Error> {
     let mut parsed_file = fload_file(old_file_path)?;
     // remove vstd imports
     parsed_file.items.retain(|item| !is_vstd_import(item));
     
-    if crux_test {
+    if options.crux_test {
         // add crux imports
         parsed_file.items.insert(0, parse_quote! {
             #[cfg(crux)] extern crate crucible;
@@ -459,7 +473,7 @@ fn assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf, crux_
 
     let mut parsed_verus_blocks = extract_verus_macro(&parsed_file)?;
     for file in parsed_verus_blocks.iter_mut() {
-        assert_transform_parsed_file(file, crux_test);
+        assert_transform_parsed_file(file, options);
     }
 
     let new_file = deghost_merge_files(&pure_file, parsed_verus_blocks);
@@ -470,8 +484,15 @@ fn assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf, crux_
     Ok(())
 }
 
-pub fn do_assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf, crux_test: bool) {
-    if let Err(error) = assert_transform_file(old_file_path, new_file_path, crux_test) {
+pub struct TransformOptions {
+    /// Generate code to use crux to find counterexamples
+    pub crux_test: bool,
+    /// Number of quantifier iterations to try
+    pub quantifier_iterations: u32,
+}
+
+pub fn do_assert_transform_file(old_file_path: &PathBuf, new_file_path: &PathBuf, options: &TransformOptions) {
+    if let Err(error) = assert_transform_file(old_file_path, new_file_path, options) {
         eprintln!("error transforming file: {}", error);
     }
 }
