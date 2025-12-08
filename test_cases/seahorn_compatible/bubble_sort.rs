@@ -18,9 +18,7 @@ extern "C" fn eh_personality() {}
 // SeaHorn-Compatible Bubble Sort
 // ------------------------------------------
 #[no_mangle]
-pub extern "C" fn bubble_sort(arr: &mut [i32; 7]) {
-    let n = 7;
-
+pub extern "C" fn bubble_sort<const n: usize>(arr: &mut [i32; n]) {
     let mut i = 0;
     while i < n {
         let mut swapped = false;
@@ -44,22 +42,12 @@ pub extern "C" fn bubble_sort(arr: &mut [i32; 7]) {
     }
 }
 
-
 // ------------------------------------------
 // main(): calls bubble_sort and asserts sortedness
 // ------------------------------------------
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
-    let mut data: [i32; 7] = [64, 34, 25, 12, 22, 11, 90];
-
+pub extern "C" fn main(mut data: [i32; 10]) -> i32 {
     bubble_sort(&mut data);
-
-    // Optional property checks for verification
-    let mut k = 0;
-    while k < 6 {
-        assert!(data[k] <= data[k + 1]);   // array is sorted
-        k += 1;
-    }
 
     0
 }

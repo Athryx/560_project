@@ -22,10 +22,8 @@ extern "C" fn eh_personality() {}
 // Jump Game II (Greedy) — SeaHorn Compatible Version
 // =========================================================
 
-const N: usize = 5;
-
 #[no_mangle]
-pub extern "C" fn jump(xs: &[i32; N]) -> i32 {
+pub extern "C" fn jump<const N: usize>(xs: &[i32; N]) -> i32 {
     let mut l: usize = 0;
     let mut r: usize = 0;
     let mut out: i32 = 0;
@@ -73,8 +71,7 @@ pub extern "C" fn jump(xs: &[i32; N]) -> i32 {
 // =========================================================
 
 #[no_mangle]
-pub extern "C" fn main(arr: [i32; N]) -> i32 {
+pub extern "C" fn main(arr: [i32; 10]) -> i32 {
     let result = jump(&arr);
-
     0
 }

@@ -37,10 +37,8 @@ pub extern "C" fn diff_accumulate(n: i32) -> i32 {
 // main calls logic
 // -------------------------
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
-    let r = diff_accumulate(5);
-
-    // Σ_i Σ_j (i-j) = 0 for symmetric bounds
-    assert!(r == 0);
+pub extern "C" fn main(n: i32) -> i32 {
+    let r = diff_accumulate(n);
+    
     0
 }

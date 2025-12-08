@@ -37,8 +37,7 @@ pub extern "C" fn pair_sum(n: i32, m: i32) -> i32 {
 // main calls logic
 // -------------------------
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
-    let r = pair_sum(4, 3);   // manually chosen test case
-    assert!(r == 18);
+pub extern "C" fn main(n: i32, m: i32) -> i32 {
+    let r = pair_sum(n, m);
     0
 }

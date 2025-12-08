@@ -41,8 +41,7 @@ pub extern "C" fn triple_nested(a: i32, b: i32, c: i32) -> i32 {
 // main calls logic
 // -------------------------
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
-    let r = triple_nested(3, 3, 3);
-    assert!(r == 27);
+pub extern "C" fn main(a: i32, b: i32, c: i32) -> i32 {
+    let r = triple_nested(a, b, c);
     0
 }

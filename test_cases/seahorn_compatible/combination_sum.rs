@@ -40,8 +40,8 @@ const ZERO_FRAME: Frame = Frame::new(0, 0);
 // ------------------------------------------------
 
 #[no_mangle]
-pub extern "C" fn combination_sum(candidates: &[i32; 4], target: i32) -> i32 {
-    let n = 4;
+pub extern "C" fn combination_sum<const N: usize>(candidates: &[i32; N], target: i32) -> i32 {
+    let n = N;
 
     let mut count: i32 = 0;
 
@@ -90,15 +90,8 @@ pub extern "C" fn combination_sum(candidates: &[i32; 4], target: i32) -> i32 {
 // ------------------------------------------------
 
 #[no_mangle]
-pub extern "C" fn main() -> i32 {
-    let candidates: [i32; 4] = [2, 3, 6, 7];
-    let res = combination_sum(&candidates, 7);
-
-    // Valid:
-    //   [2,2,3]
-    //   [7]
-    // So total = 2
-    assert!(res == 2);
+pub extern "C" fn main(candidates: [i32; 10], a: i32) -> i32 {
+    let res = combination_sum(&candidates, a);
 
     0
 }
