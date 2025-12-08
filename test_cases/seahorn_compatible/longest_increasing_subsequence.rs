@@ -1,24 +1,76 @@
-fn main () {
-    let nums = vec![10,9,2,5,3,7,101,18];
-    let result = length_of_lis(nums);
-    println!("Length of Longest Increasing Subsequence: {}", result);
+#![no_std]
+#![no_main]
+#![feature(lang_items)]
+#![feature(start)]
+
+use core::panic::PanicInfo;
+
+// ----------------------------------------
+// Required runtime stubs for no_std
+// ----------------------------------------
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
 }
 
-fn length_of_lis(nums: Vec<i32>) -> i32 {
-    let n = nums.len();
-    let mut res = 1;
-    let mut dp = Vec::with_capacity(n);
-    // let mut i=0;
-    // let mut j=0;
+#[lang = "eh_personality"]
+extern "C" fn eh_personality() {}
 
-    for i in 0..n{
-        dp.push(1);
-        for j in 0..i+1{
-            if nums[i] > nums[j]{
-                dp[i] = dp[i].max(dp[j]+1);
+
+// =============================================================
+// Longest Increasing Subsequence (O(N²) DP) — SeaHorn Compatible
+// =============================================================
+
+const N: usize = 8;
+
+#[no_mangle]
+pub extern "C" fn length_of_lis(nums: &[i32; N]) -> i32 {
+    // dp[i] = LIS ending at index i
+    let mut dp: [i32; N] = [0; N];
+
+    let mut i = 0;
+    while i < N {
+        dp[i] = 1;  // base LIS
+        let mut j = 0;
+        while j < i {
+            if nums[i] > nums[j] {
+                let cand = dp[j] + 1;
+                if cand > dp[i] {
+                    dp[i] = cand;
+                }
             }
+            j += 1;
         }
-        res = res.max(dp[i]);
+        i += 1;
     }
+
+    // Compute max over dp[]
+    let mut res = dp[0];
+    let mut k = 1;
+    while k < N {
+        if dp[k] > res {
+            res = dp[k];
+        }
+        k += 1;
+    }
+
     res
+}
+
+
+// =============================================================
+// SeaHorn entry point: tests the logic
+// =============================================================
+
+#[no_mangle]
+pub extern "C" fn main() -> i32 {
+    let nums: [i32; N] = [10, 9, 2, 5, 3, 7, 101, 18];
+
+    let result = length_of_lis(&nums);
+
+    // LIS([10,9,2,5,3,7,101,18]) = 4
+    assert!(result == 4);
+
+    0
 }
