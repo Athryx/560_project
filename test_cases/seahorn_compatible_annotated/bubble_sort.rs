@@ -17,6 +17,18 @@ extern "C" fn eh_personality() {}
 // ------------------------------------------
 // SeaHorn-Compatible Bubble Sort
 // ------------------------------------------
+
+
+
+// requires (arr.len() == n)
+// requires (n >= 0)
+// ensures  (forall|k: int| 0 <= k < n - 1 ==> arr[k] <= arr[k + 1])
+// ensures  (forall|v: int| count(arr, v) == count(old(arr), v))
+// ensures  (forall|p: int, q: int|
+//     0 <= p < q < n && old(arr[p]) == old(arr[q]) ==> index_of(arr, old(arr[p]), p) < index_of(arr, old(arr[q]), q)
+
+
+
 #[no_mangle]
 pub extern "C" fn bubble_sort<const n: usize>(arr: &mut [i32; n]) {
     let mut i = 0;
