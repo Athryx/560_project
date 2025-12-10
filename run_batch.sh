@@ -19,12 +19,19 @@ shift 2  # remove required args so $@ now contains only optionals
 OPTIONAL_ARGS=()
 ANNOTATED_FLAG=false
 WITH_SMT2_FLAG=false
+WITH_CRUX_FLAG=false
 
 # Parse optional flags
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --with-smt2)
             OPTIONAL_ARGS+=("--with-smt2")
+            WITH_SMT2_FLAG=true
+            shift
+            ;;
+        --with-crux)
+            OPTIONAL_ARGS+=("--with-crux")
+            WITH_CRUX_FLAG=true
             shift
             ;;
         --rust-only)
@@ -52,8 +59,16 @@ for FILE in "$DIR"/*.rs; do
     if [ -f "$FILE" ]; then
         BASENAME=$(basename "$FILE")
 
-        if [ "$ANNOTATED_FLAG" = true ] && [ "$WITH_SMT2_FLAG" = true ]; then
+        if [ "$WITH_CRUX_FLAG" = true ] && [ "$WITH_SMT2_FLAG" = true ] && [ "$ANNOTATED_FLAG" = true ]; then
+            OUTFILE="${BASENAME%.rs}_verified_crux_smt2_verified.rs"
+        elif [ "$WITH_CRUX_FLAG" = true ] && [ "$WITH_SMT2_FLAG" = true ]; then
+            OUTFILE="${BASENAME%.rs}_verified_crux_smt2.rs"
+        elif [ "$WITH_CRUX_FLAG" = true ] && [ "$ANNOTATED_FLAG" = true ]; then
+            OUTFILE="${BASENAME%.rs}_verified_crux_annotated.rs"
+        elif [ "$WITH_SMT2_FLAG" = true ] && [ "$ANNOTATED_FLAG" = true ]; then
             OUTFILE="${BASENAME%.rs}_verified_smt2_annotated.rs"
+        elif [ "$WITH_CRUX_FLAG" = true ]; then
+            OUTFILE="${BASENAME%.rs}_verified_crux.rs"
         elif [ "$WITH_SMT2_FLAG" = true ]; then
             OUTFILE="${BASENAME%.rs}_verified_smt2.rs"
         elif [ "$ANNOTATED_FLAG" = true ]; then
