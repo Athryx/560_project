@@ -1,13 +1,14 @@
 #!/bin/bash
 
 # Usage check
-if [ $# -ne 1 ]; then
-    echo "Usage: $0 <file_without_extension>"
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <test_directory> <file_without_extension> "
     exit 1
 fi
 
-NAME="$1"
-SRC="test_cases/seahorn_compatible/${NAME}.rs"
+TEST_DIRECTORY="$1"
+NAME="$2"
+SRC="test_cases/${TEST_DIRECTORY}/${NAME}.rs"
 BC_OUT="${NAME}.bc"
 STRIPPED="smt_output/${NAME}_strip.bc"
 SMT_OUT="smt_output/${NAME}.smt2"
