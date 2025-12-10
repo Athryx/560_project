@@ -39,6 +39,16 @@ const ZERO_FRAME: Frame = Frame::new(0, 0);
 //  Combination Sum using explicit DFS stack
 // ------------------------------------------------
 
+
+// requires (N == candidates.len())
+// requires (MAX_STACK > 0)
+// requires (target >= 0)
+// requires (forall|i: int| 0 <= i < N ==> candidates[i] > 0)
+// requires enough_stack_for_complete_exploration(candidates, target, MAX_STACK))
+// ensures (result >= 0)
+// ensures (result == combination_count_unbounded_nondec(candidates, target))
+
+
 #[no_mangle]
 pub extern "C" fn combination_sum<const N: usize>(candidates: &[i32; N], target: i32) -> i32 {
     let n = N;
