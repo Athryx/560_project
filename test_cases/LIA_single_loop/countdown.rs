@@ -16,6 +16,10 @@ extern "C" fn eh_personality() {}
 // -------------------------------------
 // Counts how many steps until reaching 0
 // -------------------------------------
+
+
+// requires(n >= 0)
+// ensures(result == n)
 #[no_mangle]
 pub extern "C" fn countdown(n: i32) -> i32 {
     let mut steps = 0;

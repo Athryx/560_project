@@ -16,6 +16,10 @@ extern "C" fn eh_personality() {}
 // -------------------------------------
 // Linear update inside a single loop
 // -------------------------------------
+
+
+// requires (n >= 0)
+// ensures (result == compute_linear_update(n))
 #[no_mangle]
 pub extern "C" fn linear_update(n: i32) -> i32 {
     let mut state = 0;

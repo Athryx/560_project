@@ -17,6 +17,10 @@ extern "C" fn eh_personality() {}
 // Linear integer state progression
 // -------------------------------------
 #[no_mangle]
+
+
+// requires (n >= 0)
+// ensures (result == compute_state(n))
 pub extern "C" fn state_machine(n: i32) -> i32 {
     let mut state = 0;
     let mut i = 0;

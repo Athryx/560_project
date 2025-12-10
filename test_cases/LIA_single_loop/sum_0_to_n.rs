@@ -16,6 +16,10 @@ extern "C" fn eh_personality() {}
 // -------------------------------------
 // Sum of first n integers
 // -------------------------------------
+
+
+// requires (n >= 0)
+// ensures (result == (n * (n - 1)) / 2)
 #[no_mangle]
 pub extern "C" fn sum_range(n: i32) -> i32 {
     let mut total = 0;
