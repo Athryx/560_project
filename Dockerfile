@@ -117,6 +117,8 @@ COPY --chown=appuser:appuser submodules/verus-proof-synthesis /home/appuser/veru
 
 COPY --chown=appuser:appuser test_cases /home/appuser/verus-proof-synthesis/test_cases
 COPY --chown=appuser:appuser seahorn_script.sh /home/appuser/verus-proof-synthesis/seahorn_script.sh
+COPY --chown=appuser:appuser run_batch.sh /home/appuser/verus-proof-synthesis/run_batch.sh
+COPY --chown=appuser:appuser run_verus_batch.sh /home/appuser/verus-proof-synthesis/run_verus_batch.sh
 
 ############################################
 # Build Verus
