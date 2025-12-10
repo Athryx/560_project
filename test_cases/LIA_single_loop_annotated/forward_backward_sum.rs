@@ -13,6 +13,8 @@ extern "C" fn eh_personality() {}
 
 #[no_mangle]
 
+// requires (a >= 0)
+// ensures (result == compute_forward_backward(a))
 pub extern "C" fn forward_backward(a: i32) -> i32 {
     let mut total = 0;
 

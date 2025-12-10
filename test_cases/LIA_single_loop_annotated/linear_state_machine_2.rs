@@ -13,13 +13,20 @@ fn panic(_info: &PanicInfo) -> ! {
 #[lang = "eh_personality"]
 extern "C" fn eh_personality() {}
 
+// -------------------------------------
+// Linear integer state progression
+// -------------------------------------
 #[no_mangle]
-pub extern "C" fn linear_update(n: i32) -> i32 {
+
+
+// requires (n >= 0)
+// ensures (result == compute_state(n))
+pub extern "C" fn state_machine(n: i32) -> i32 {
     let mut state = 0;
     let mut i = 0;
 
     while i < n {
-        state = state + 3 * i + 1;
+        state = 2 * state + i;
         i += 1;
     }
 
@@ -28,6 +35,6 @@ pub extern "C" fn linear_update(n: i32) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn main(n: i32) -> i32 {
-    let _ = linear_update(n);
+    let _ = state_machine(n);
     0
 }

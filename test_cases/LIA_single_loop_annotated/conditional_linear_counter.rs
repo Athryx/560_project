@@ -11,6 +11,11 @@ fn panic(_info: &PanicInfo) -> ! { loop {} }
 #[lang = "eh_personality"]
 extern "C" fn eh_personality() {}
 
+
+// requires(a >= 0)
+// ensures(result == compute_conditional_sum(a))
+
+
 #[no_mangle]
 pub extern "C" fn conditional_counter(a: i32) -> i32 {
     let mut state = 0;

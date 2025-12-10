@@ -13,6 +13,8 @@ extern "C" fn eh_personality() {}
 
 #[no_mangle]
 
+// requires (a >= 0 && b >= 0)
+// ensures (result == ((a * (a - 1)) / 2) + (b * b))
 pub extern "C" fn two_sums(a: i32, b: i32) -> i32 {
     let mut s1 = 0;
     let mut s2 = 0;

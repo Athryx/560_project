@@ -13,21 +13,28 @@ fn panic(_info: &PanicInfo) -> ! {
 #[lang = "eh_personality"]
 extern "C" fn eh_personality() {}
 
+// -------------------------------------
+// Sum of first n integers
+// -------------------------------------
+
+
+// requires (n >= 0)
+// ensures (result == (n * (n - 1)) / 2)
 #[no_mangle]
-pub extern "C" fn linear_update(n: i32) -> i32 {
-    let mut state = 0;
+pub extern "C" fn sum_range(n: i32) -> i32 {
+    let mut total = 0;
     let mut i = 0;
 
     while i < n {
-        state = state + 3 * i + 1;
+        total = total + i;
         i += 1;
     }
 
-    state
+    total
 }
 
 #[no_mangle]
 pub extern "C" fn main(n: i32) -> i32 {
-    let _ = linear_update(n);
+    let _ = sum_range(n);
     0
 }
