@@ -1,3 +1,8 @@
+
+// requires (modulo > 0)
+// ensures (result >= 0 && result < modulo)
+// ensures (result == modular_pow(base, exponent, modulo))
+
 fn pow(base: u64, exponent: u64, modulo: u64) -> u64 {
     if exponent == 0 {
         return 1;

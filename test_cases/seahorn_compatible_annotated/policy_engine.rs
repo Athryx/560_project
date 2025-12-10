@@ -19,6 +19,15 @@ pub struct Context {
     group_memberships: HashMap<Group, HashSet<User>>,
 }
 
+
+// requires(self.well_formed())
+//     ensures(result == (
+//         self.user_rules.contains(&(user, resource)) ||
+//         exists|g: Group| self.group_memberships.contains_key(g) &&
+//                         self.group_memberships[g].contains(user) &&
+//                         self.group_rules.contains(&(g, resource))
+//     ))
+
 impl Context {
     pub fn new() -> Self {
         Self::default()

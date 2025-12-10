@@ -16,6 +16,11 @@ extern "C" fn eh_personality() {}
 // -------------------------
 // Logic function
 // -------------------------
+
+
+// requires(n >= 0)
+// ensures(result == sum_diff(n))
+
 #[no_mangle]
 pub extern "C" fn diff_accumulate(n: i32) -> i32 {
     let mut acc = 0;

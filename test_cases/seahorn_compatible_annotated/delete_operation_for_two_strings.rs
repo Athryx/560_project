@@ -22,6 +22,16 @@ extern "C" fn eh_personality() {}
 
 // const MAX_M: usize = 8;   // supports up to 8 chars; small for demo
 
+
+
+// requires (N >= 0)
+// requires (MAX_M >= N + 1)
+// requires (w1.len() == N && w2.len() == N)
+// requires (forall|i: int| 0 <= i < N ==> w1[i] >= 0 && w2[i] >= 0)
+// ensures result == (N + N - 2 * lcs(w1, w2)) as i32)
+// ensures result >= 0)
+
+
 #[no_mangle]
 pub extern "C" fn delete_operation_for_two_strings<const N: usize, const MAX_M: usize>(
     w1: &[u8; N],

@@ -16,6 +16,11 @@ extern "C" fn eh_personality() {}
 // -------------------------
 // Logic function
 // -------------------------
+
+
+// requires(a >= 0 && b >= 0 && c >= 0)
+// ensures(result == a * b * c)
+
 #[no_mangle]
 pub extern "C" fn triple_nested(a: i32, b: i32, c: i32) -> i32 {
     let mut acc = 0;

@@ -22,6 +22,12 @@ extern "C" fn eh_personality() {}
 // Jump Game II (Greedy) — SeaHorn Compatible Version
 // =========================================================
 
+
+// requires (N > 0)
+// requires (forall|i: int| 0 <= i < N ==> xs[i] >= 0)
+// ensures (result >= 0)
+// ensures (result == min_jumps(xs))
+
 #[no_mangle]
 pub extern "C" fn jump<const N: usize>(xs: &[i32; N]) -> i32 {
     let mut l: usize = 0;
