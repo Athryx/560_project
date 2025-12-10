@@ -54,6 +54,12 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV RUST_BACKTRACE=1
 
+# install add-apt-repository command
+RUN apt-get update && apt-get install -y software-properties-common
+# add ppa for yices
+RUN add-apt-repository ppa:sri-csl/formal-methods
+
+
 ############################################
 # Install system dependencies
 ############################################
@@ -62,6 +68,8 @@ RUN apt-get update && apt-get install -y \
     curl build-essential pkg-config libssl-dev \
     git vim unzip sudo wget \
     ca-certificates gnupg lsb-release \
+    yices2 \
+    z3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -144,6 +152,34 @@ ENV PATH="/home/appuser/venv/bin:/home/appuser/verus-proof-synthesis/verus/sourc
 
 RUN pip install --upgrade pip setuptools wheel
 RUN pip install -r /home/appuser/verus-proof-synthesis/requirements.txt
+
+############################################
+# Install crux-mir
+############################################
+# mir-json
+# proper rust version
+RUN rustup toolchain install nightly-2025-09-14 --force --component rustc-dev,rust-src
+COPY mir-json-ubuntu-22.04-X64/ /mir-json
+ENV PATH="/mir-json/bin:${PATH}"
+ENV CRUX_RUST_LIBRARY_PATH="/mir-json/rlibs"
+
+# install haskell
+ENV BOOTSTRAP_HASKELL_NONINTERACTIVE=1
+RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+ENV PATH="/home/appuser/.ghcup/bin:${PATH}"
+
+# RUN sudo apt-get update && sudo apt-get install -y golang
+
+# clone crucible
+WORKDIR /home/appuser
+RUN git clone https://github.com/GaloisInc/crucible.git
+WORKDIR /home/appuser/crucible/crux-mir
+RUN git submodule update --init --recursive
+RUN cabal update
+RUN cabal install exe:crux-mir
+
+# reset workdir
+WORKDIR /home/appuser/verus-proof-synthesis
 
 ############################################
 # Optional Azure CLI
