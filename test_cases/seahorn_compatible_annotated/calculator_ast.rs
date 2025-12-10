@@ -10,9 +10,9 @@ enum Expr {
 impl Expr {
 
 
-    // requires(self.well_formed())]
-    // requires(forall|e: &Expr| e.in(self) ==> e.is_div() ==> e.rhs_nonzero())]
-    // ensures(result == self.evaluate_mathematically())]
+    // requires (self.well_formed())
+    // requires (forall|e: &Expr| e.in(self) ==> e.is_div() ==> e.rhs_nonzero())
+    // ensures  (result == self.evaluate_mathematically())
 
     fn eval(&self) -> i32 {
         match self {

@@ -21,6 +21,15 @@ extern "C" fn eh_personality() {}
 // Maximal Rectangle (fixed 4×5 version)
 // ============================================================
 
+
+// requires(matrix.len() == ROWS)
+// requires(forall|i: int| 0 <= i < ROWS ==> matrix[i].len() == COLS)
+// requires(forall|i: int, j: int|
+//     0 <= i < ROWS && 0 <= j < COLS ==> matrix[i][j] == 0 || matrix[i][j] == 1)
+// ensures(result >= 0)]
+// ensures(result == maximal_area(matrix))
+
+
 const ROWS: usize = 4;
 const COLS: usize = 5;
 

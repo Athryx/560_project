@@ -7,6 +7,17 @@ pub(crate) struct BigInt {
     digits: Vec<u8>,
 }
 
+
+
+// requires(true)
+// ensures(self.digits.len() >= old(self.digits.len()))
+// ensures(self.digits.len() <= old(self.digits.len()) + 2)
+// ensures(forall|i: int|
+//     old(self.digits.len()) <= i < self.digits.len() ==> self.digits[i] == 0)
+// // Preserve numeric value and well-formedness.
+// ensures(val(&self.digits) == val(&old(self).digits))
+// ensures(well_formed(&self.digits))
+
 impl BigInt {
     pub(crate) fn new() -> Self {
         BigInt { digits: Vec::new() }
@@ -38,6 +49,13 @@ impl BigInt {
     }
 }
 
+
+
+// requires (increment < 16)
+// requires (well_formed(&self.digits))
+// ensures (val(&self.digits) == val(&old(self).digits) + increment as int)
+// ensures (well_formed(&self.digits))
+
 impl AddAssign<u8> for BigInt {
     // Assumes increment <16.
     fn add_assign(&mut self, mut increment: u8) {
@@ -52,6 +70,12 @@ impl AddAssign<u8> for BigInt {
         }
     }
 }
+
+
+// requires (base <= 16)
+// requires (well_formed(&self.digits))
+// ensures (val(&self.digits) == val(&old(self).digits) * base as int)
+// ensures (well_formed(&self.digits))
 
 impl MulAssign<u8> for BigInt {
     // Assumes base <=16.

@@ -22,6 +22,12 @@ extern "C" fn eh_personality() {}
 // Longest Increasing Subsequence (O(N²) DP) — SeaHorn Compatible
 // =============================================================
 
+
+// requires (N > 0)
+// requires (forall|i: int| 0 <= i < N ==> true)
+// ensures (result >= 1)
+// ensures (result == lis_length(nums))
+
 #[no_mangle]
 pub extern "C" fn length_of_lis<const N: usize>(nums: &[i32; N]) -> i32 {
     // dp[i] = LIS ending at index i

@@ -17,6 +17,10 @@ fn panic(_info: &PanicInfo) -> ! {
 extern "C" fn eh_personality() {}
 
 
+
+// requires(a >= 0 && b >= 0)
+// ensures(result == compute_state(a, b))
+
 pub fn state_machine(a: i32, b: i32) -> i32 {
     let mut state = 0;
     let mut i = 0;

@@ -22,6 +22,15 @@ extern "C" fn eh_personality() {}
 // SeaHorn-Compatible erase_overlap_intervals
 // ======================================================
 
+
+// requires (intervals.len() == N)
+// requires (forall|i: int|
+//     0 <= i < N ==> intervals[i].len() == 2)
+// requires (forall|i: int|
+//     0 <= i < N ==> intervals[i][0] <= intervals[i][1]) 
+// ensures (result >= 0)
+// ensures (result == min_removals_to_non_overlapping(old(intervals)))
+
 const N: usize = 4; // number of intervals
 
 #[no_mangle]

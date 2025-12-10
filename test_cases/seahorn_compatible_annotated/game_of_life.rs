@@ -24,6 +24,15 @@ extern "C" fn eh_personality() {}
 const ROWS: usize = 4;
 const COLS: usize = 3;
 
+
+
+//requires (board.len() == ROWS && next.len() == ROWS)
+//requires (forall|i: int| 0 <= i < ROWS ==> board[i].len() == COLS && next[i].len() == COLS)
+//requires (forall|i: int, j: int|
+//    0 <= i < ROWS && 0 <= j < COLS ==> board[i][j] == 0 || board[i][j] == 1)
+//ensures (forall|i: int, j: int|
+//    0 <= i < ROWS && 0 <= j < COLS ==> next[i][j] == life_rule(board, i, j))
+
 // next[i][j] = f(board[i][j], live_neighbors)
 #[no_mangle]
 pub extern "C" fn game_of_life(

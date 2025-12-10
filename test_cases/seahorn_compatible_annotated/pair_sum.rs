@@ -16,6 +16,11 @@ extern "C" fn eh_personality() {}
 // -------------------------
 // Logic function
 // -------------------------
+
+
+// requires (n >= 0 && m >= 0)
+// ensures (result == sum_pairs(n, m))
+
 #[no_mangle]
 pub extern "C" fn pair_sum(n: i32, m: i32) -> i32 {
     let mut acc = 0;
