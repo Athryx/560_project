@@ -138,6 +138,7 @@ ENV PATH="/home/appuser/.ghcup/bin:${PATH}"
 WORKDIR /home/appuser
 RUN git clone https://github.com/GaloisInc/crucible.git
 WORKDIR /home/appuser/crucible/crux-mir
+RUN git checkout 15ef04df9feff11ad420ee98367ac9bb81c22afc
 RUN git submodule update --init --recursive
 RUN cabal update
 RUN cabal install exe:crux-mir
