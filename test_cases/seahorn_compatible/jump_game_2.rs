@@ -23,10 +23,11 @@ extern "C" fn eh_personality() {}
 // =========================================================
 
 #[no_mangle]
-pub extern "C" fn jump<const N: usize>(xs: &[i32; N]) -> i32 {
+pub extern "C" fn jump(xs: &[i32]) -> i32 {
     let mut l: usize = 0;
     let mut r: usize = 0;
     let mut out: i32 = 0;
+    let N = xs.len();
 
     // while r + 1 < len
     while r + 1 < N {
@@ -71,7 +72,7 @@ pub extern "C" fn jump<const N: usize>(xs: &[i32; N]) -> i32 {
 // =========================================================
 
 #[no_mangle]
-pub extern "C" fn main(arr: [i32; 10]) -> i32 {
-    let result = jump(&arr);
+pub extern "C" fn main(arr: &[i32]) -> i32 {
+    let result = jump(arr);
     0
 }

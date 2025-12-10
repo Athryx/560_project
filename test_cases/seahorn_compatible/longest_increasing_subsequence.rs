@@ -23,9 +23,10 @@ extern "C" fn eh_personality() {}
 // =============================================================
 
 #[no_mangle]
-pub extern "C" fn length_of_lis<const N: usize>(nums: &[i32; N]) -> i32 {
+pub extern "C" fn length_of_lis(nums: &[i32]) -> i32 {
     // dp[i] = LIS ending at index i
-    let mut dp: [i32; N] = [0; N];
+    let N = nums.len();
+    let mut dp: [i32; 256] = [0; 256]; // assuming max length 256 for simplicity
 
     let mut i = 0;
     while i < N {
@@ -62,7 +63,7 @@ pub extern "C" fn length_of_lis<const N: usize>(nums: &[i32; N]) -> i32 {
 // =============================================================
 
 #[no_mangle]
-pub extern "C" fn main(nums: [i32; 8]) -> i32 {
-    let result = length_of_lis(&nums);
+pub extern "C" fn main(nums: &[i32]) -> i32 {
+    let result = length_of_lis(nums);
     0
 }

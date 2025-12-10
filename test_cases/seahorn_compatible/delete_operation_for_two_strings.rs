@@ -20,18 +20,18 @@ extern "C" fn eh_personality() {}
 //  delete_operation_for_two_strings (SeaHorn compatible)
 // ======================================================
 
-const MAX_M: usize = 8;   // supports up to 8 chars; small for demo
+// const MAX_M: usize = 8;   // supports up to 8 chars; small for demo
 
 #[no_mangle]
 pub extern "C" fn delete_operation_for_two_strings(
-    w1: &[u8; 3],
-    w2: &[u8; 3]
+    w1: &[u8],
+    w2: &[u8]
 ) -> i32 {
-    let n1 = 3;
-    let n2 = 3;
+    let n1 = w1.len();
+    let n2 = w2.len();
 
     // dp[j] = LCS for prefix of w1[..i] and w2[..j]
-    let mut dp: [usize; MAX_M] = [0; MAX_M];
+    let mut dp: [usize; 256] = [0; 256];
 
     let mut i = 0;
     while i < n1 {
@@ -77,8 +77,8 @@ pub extern "C" fn delete_operation_for_two_strings(
 // ======================================================
 
 #[no_mangle]
-pub extern "C" fn main(w1: [u8; 3], w2: [u8; 3]) -> i32 {
-    let result = delete_operation_for_two_strings(&w1, &w2);
+pub extern "C" fn main(w1: &[u8], w2: &[u8]) -> i32 {
+    let result = delete_operation_for_two_strings(w1, w2);
 
     0
 }
