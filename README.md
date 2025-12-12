@@ -46,7 +46,8 @@ vim config-artifact-openai.json
 
 Add your OpenAI API key in the "aoai_api_key" field in the file 'config-artifact-openai.json'
 
-In case you want to run the pipeline on a batch of test cases without annotation, run the following command:
+### Running on a batch of test cases at a time
+In case you want to run the pipeline on a batch of test cases, run the following command from the "code" directory:
 
 ```
 ./run_batch.sh ${DIRECTORY_PATH} ${OPTIONAL_KWARGS}
@@ -59,10 +60,23 @@ For example:
 
 If you have annotated test cases, you can add the ```--annotated``` flag.
 
-The results will be generated in the code directory, ended in *_verified.rs or *_verified_crux.rs etc. format, depending on the keyword arguments. 
+### Running on one file
+In case you want to test one file, run the following command from the "code" directory:
+
+```
+python main.py --input ${INPUT_DIRECTORY} --output ${OUTPUT_FILE_NAME} --config config-artifact-openai.json ${OPTIONAL_KWARGS}
+```
+
+For example:
+
+```
+python main.py --input ../test_cases/Nested_loops/nested_sum_1.rs --output nested_sum_1_verified_crux_smt2.rs --config config-artifact-openai.json --learning-type 1 --with-smt2 --with-crux
+```
+
+The results will be generated in the "code" directory, ended in *_verified.rs or *_verified_crux.rs etc. format, depending on the keyword arguments. 
 Then you can run Verus on the generated output, for example:
 
 ```
-verus sum_0_to_n.rs
+verus nested_sum_1.rs
 ```
 
