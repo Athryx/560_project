@@ -8,7 +8,7 @@ fi
 
 TEST_DIRECTORY="$1"
 NAME="$2"
-SRC="test_cases/${TEST_DIRECTORY}/${NAME}.rs"
+SRC="${TEST_DIRECTORY}/${NAME}.rs"
 BC_OUT="${NAME}.bc"
 STRIPPED="smt_output/${NAME}_strip.bc"
 SMT_OUT="smt_output/${NAME}.smt2"
