@@ -4,12 +4,20 @@ In this project, we modify the AutoVerus pipeline by integrating Symbolic Execut
 
 ## Steps to Run the Pipeline
 
+(All the commands here are given for a linux terminal)
+
+## Initial buildup
+
 ### Option 1. Building docker image
 
 ```
 git clone git@github.com:athryx/560_project
 cd 560_project
 git submodule update --init --recursive
+cd ./submodules/verus-proof-synthesis
+git checkout main
+git pull
+cd -
 docker build -t autoverus-plus .
 ```
 
@@ -17,6 +25,17 @@ After the docker image is built, start a container,
 ```
 docker run -it autoverus-plus /bin/bash
 ```
+
+### Option 2. Using the existing docker image
+
+Run the following commands
+
+```
+docker pull faaizmemon/560_project
+docker run -it faaizmemon/560_project
+```
+
+## Executing the pipeline on the test cases 
 
 Inside the docker node, navigate to code directory, and open the config file needed
 
@@ -46,3 +65,4 @@ Then you can run Verus on the generated output, for example:
 ```
 verus sum_0_to_n.rs
 ```
+
